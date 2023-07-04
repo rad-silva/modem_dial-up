@@ -1,8 +1,65 @@
 #include "uart.hpp"
+#include <queue>
+#include <iostream>
+
 
 void UART_RX::put_samples(const unsigned int *buffer, unsigned int n)
 {
-    // seu código aqui
+    static enum class State {
+        SINCRONIZING, 
+        RECEIVING
+    } state = State::SINCRONIZING;
+
+    static unsigned int bit_counter = 0;
+    static unsigned int noisy_counter = 0;
+    static unsigned int set_bit = 0;
+    static uint8_t byte = 0;
+
+    for (unsigned int i = 0; i < n; i++) {
+        unsigned int sample = buffer[i];
+
+        switch (state) {
+            // Verifica se 25 dentre as ultimas 30 amostras 
+            // lidas possuem nível lógico baixo
+            case State::SINCRONIZING:
+                bit_counter++;
+
+                if (sample == 0) {
+                    if (bit_counter == 30) {
+                        state = State::RECEIVING;
+                        byte = 0;
+                        bit_counter = 0;
+                        noisy_counter = 0;
+                    }
+
+                } else {
+                    noisy_counter++;
+
+                    if (noisy_counter > 5) {
+                        bit_counter = 0;
+                        noisy_counter = 0;
+                    }
+                }
+            break;
+
+            // Inicia a contagem a partir do meio dos bits de dados
+            case State::RECEIVING:
+                bit_counter++;
+                
+                if ((bit_counter % SAMPLES_PER_SYMBOL) - (SAMPLES_PER_SYMBOL / 2) == 0) {
+                    byte = byte | (sample << (bit_counter / SAMPLES_PER_SYMBOL - 1 ));
+
+                    if (bit_counter >= (9 * SAMPLES_PER_SYMBOL)) {
+                        get_byte(byte);
+
+                        state = State::SINCRONIZING;
+                        bit_counter = 0;
+                        noisy_counter = 0;
+                    }
+                }
+            break;
+        }
+    }
 }
 
 void UART_TX::put_byte(uint8_t byte)
