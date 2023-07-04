@@ -24,15 +24,14 @@ void UART_RX::put_samples(const unsigned int *buffer, unsigned int n)
             case State::SINCRONIZING:
                 bit_counter++;
 
-                if (sample == 0) {
-                    if (bit_counter == 30) {
-                        state = State::RECEIVING;
-                        byte = 0;
-                        bit_counter = 0;
-                        noisy_counter = 0;
-                    }
+                if (bit_counter == 30) {
+                    state = State::RECEIVING;
+                    byte = 0;
+                    bit_counter = 0;
+                    noisy_counter = 0;
+                }
 
-                } else {
+                if (sample != 0) {
                     noisy_counter++;
 
                     if (noisy_counter > 5) {
@@ -42,7 +41,8 @@ void UART_RX::put_samples(const unsigned int *buffer, unsigned int n)
                 }
             break;
 
-            // Inicia a contagem a partir do meio dos bits de dados
+            // Lê um bit de dado a cada 160 amaostras, iniciando a
+            // partir do bit_counter = 80 (meio do primeiro intervalo de dados)
             case State::RECEIVING:
                 bit_counter++;
                 
